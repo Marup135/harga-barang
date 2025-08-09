@@ -3,78 +3,23 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Daftar Harga Dinamis</title>
+    <title>Daftar Harga - Firebase</title>
     <style>
-        /* Ini adalah bagian untuk mengatur tampilan (CSS) */
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-            margin: 0;
-            padding: 20px;
-            background-color: #f4f7f6;
-            color: #333;
-        }
-        .container {
-            max-width: 800px;
-            margin: 0 auto;
-            background-color: #ffffff;
-            padding: 30px;
-            border-radius: 8px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-        }
-        h1, h2 {
-            text-align: center;
-            color: #0056b3;
-        }
-        form {
-            display: flex;
-            gap: 10px;
-            margin-bottom: 20px;
-            flex-wrap: wrap;
-        }
-        input[type="text"], input[type="number"] {
-            flex: 1;
-            padding: 10px;
-            border: 1px solid #ccc;
-            border-radius: 4px;
-            font-size: 16px;
-        }
-        button {
-            padding: 10px 20px;
-            border: none;
-            background-color: #007bff;
-            color: white;
-            border-radius: 4px;
-            cursor: pointer;
-            font-size: 16px;
-        }
-        button:hover {
-            background-color: #0056b3;
-        }
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-top: 20px;
-        }
-        th, td {
-            padding: 12px;
-            border: 1px solid #ddd;
-            text-align: left;
-        }
-        th {
-            background-color: #007bff;
-            color: white;
-        }
-        tr:nth-child(even) {
-            background-color: #f2f2f2;
-        }
-        .hapus-btn {
-            background-color: #dc3545;
-            padding: 5px 10px;
-            font-size: 12px;
-        }
-        .hapus-btn:hover {
-            background-color: #c82333;
-        }
+        /* Gaya CSS tidak berubah, bisa gunakan yang sebelumnya */
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; margin: 0; padding: 20px; background-color: #f4f7f6; color: #333; }
+        .container { max-width: 800px; margin: 0 auto; background-color: #ffffff; padding: 30px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        h1, h2 { text-align: center; color: #0056b3; }
+        form { display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; }
+        input[type="text"], input[type="number"] { flex: 1; padding: 10px; border: 1px solid #ccc; border-radius: 4px; font-size: 16px; }
+        button { padding: 10px 20px; border: none; background-color: #007bff; color: white; border-radius: 4px; cursor: pointer; font-size: 16px; }
+        button:hover { background-color: #0056b3; }
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        th, td { padding: 12px; border: 1px solid #ddd; text-align: left; }
+        th { background-color: #007bff; color: white; }
+        tr:nth-child(even) { background-color: #f2f2f2; }
+        .hapus-btn { background-color: #dc3545; padding: 5px 10px; font-size: 12px; }
+        .hapus-btn:hover { background-color: #c82333; }
+        #loading { text-align: center; padding: 20px; }
     </style>
 </head>
 <body>
@@ -90,6 +35,7 @@
         </form>
 
         <h2>Daftar Harga Saat Ini</h2>
+        <div id="loading">Memuat data...</div>
         <table>
             <thead>
                 <tr>
@@ -103,85 +49,116 @@
         </table>
     </div>
 
+    <script src="https://www.gstatic.com/firebasejs/9.6.7/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.7/firebase-firestore-compat.js"></script>
+
     <script>
-        // Ini adalah bagian untuk fungsi (JavaScript)
+        // ======================================================================
+        // KONFIGURASI FIREBASE ANDA
+        // GANTI DENGAN KODE KONFIGURASI YANG ANDA DAPAT DARI FIREBASE
+        // ======================================================================
+        const firebaseConfig = {
+          apiKey: "AIzaSy...YOUR-API-KEY",
+          authDomain: "your-project-id.firebaseapp.com",
+          projectId: "your-project-id",
+          storageBucket: "your-project-id.appspot.com",
+          messagingSenderId: "1234567890",
+          appId: "1:1234567890:web:abcdef123456"
+        };
+        // ======================================================================
+
+        // Inisialisasi Firebase
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.firestore();
+
+        // Referensi ke koleksi 'barang' di Firestore
+        const barangCollection = db.collection('barang');
+
         const formBarang = document.getElementById('form-barang');
         const namaBarangInput = document.getElementById('nama-barang');
         const hargaBarangInput = document.getElementById('harga-barang');
         const tabelHarga = document.getElementById('tabel-harga');
+        const loading = document.getElementById('loading');
 
-        // Fungsi untuk memformat angka menjadi Rupiah
         function formatRupiah(angka) {
             return new Intl.NumberFormat('id-ID', {
-                style: 'currency',
-                currency: 'IDR',
-                minimumFractionDigits: 0
+                style: 'currency', currency: 'IDR', minimumFractionDigits: 0
             }).format(angka);
         }
 
-        // Fungsi untuk mengambil data dari localStorage dan menampilkannya di tabel
-        function renderTabel() {
-            // Ambil data dari localStorage, jika tidak ada, gunakan array kosong
-            const daftarBarang = JSON.parse(localStorage.getItem('daftarBarang')) || [];
-            
-            // Kosongkan isi tabel sebelum diisi lagi
+        // Fungsi untuk mengambil dan menampilkan data dari Firestore
+        async function renderTabel() {
+            loading.style.display = 'block';
             tabelHarga.innerHTML = '';
+            
+            try {
+                // Ambil data dari Firestore, urutkan berdasarkan nama
+                const snapshot = await barangCollection.orderBy('nama').get();
+                
+                if (snapshot.empty) {
+                    loading.textContent = 'Belum ada data.';
+                    return;
+                }
 
-            // Looping setiap barang dan masukkan ke tabel
-            daftarBarang.forEach((barang, index) => {
-                const baris = document.createElement('tr');
-                baris.innerHTML = `
-                    <td>${barang.nama}</td>
-                    <td>${formatRupiah(barang.harga)}</td>
-                    <td><button class="hapus-btn" data-index="${index}">Hapus</button></td>
-                `;
-                tabelHarga.appendChild(baris);
-            });
+                snapshot.forEach(doc => {
+                    const barang = doc.data();
+                    const baris = document.createElement('tr');
+                    baris.innerHTML = `
+                        <td>${barang.nama}</td>
+                        <td>${formatRupiah(barang.harga)}</td>
+                        <td><button class="hapus-btn" data-id="${doc.id}">Hapus</button></td>
+                    `;
+                    tabelHarga.appendChild(baris);
+                });
+
+                loading.style.display = 'none';
+
+            } catch (error) {
+                console.error("Error mengambil data: ", error);
+                loading.textContent = 'Gagal memuat data.';
+            }
         }
 
-        // Fungsi untuk menangani penambahan barang
-        formBarang.addEventListener('submit', function(event) {
-            event.preventDefault(); // Mencegah form mengirim data ke server
-
-            const namaBarang = namaBarangInput.value;
-            const hargaBarang = hargaBarangInput.value;
-
-            const daftarBarang = JSON.parse(localStorage.getItem('daftarBarang')) || [];
+        // Fungsi untuk menambah barang baru ke Firestore
+        formBarang.addEventListener('submit', async (event) => {
+            event.preventDefault();
             
-            daftarBarang.push({ nama: namaBarang, harga: hargaBarang });
+            const namaBarang = namaBarangInput.value;
+            // Penting: simpan harga sebagai angka, bukan teks
+            const hargaBarang = Number(hargaBarangInput.value);
 
-            // Simpan kembali array yang sudah diupdate ke localStorage
-            localStorage.setItem('daftarBarang', JSON.stringify(daftarBarang));
-
-            // Reset form
-            formBarang.reset();
-
-            // Render ulang tabel
-            renderTabel();
-        });
-
-        // Fungsi untuk menangani penghapusan barang
-        tabelHarga.addEventListener('click', function(event) {
-            // Cek apakah yang diklik adalah tombol hapus
-            if (event.target.classList.contains('hapus-btn')) {
-                const index = event.target.getAttribute('data-index');
-                
-                const daftarBarang = JSON.parse(localStorage.getItem('daftarBarang')) || [];
-                
-                // Hapus item dari array berdasarkan index
-                daftarBarang.splice(index, 1);
-                
-                // Simpan kembali array yang sudah diupdate ke localStorage
-                localStorage.setItem('daftarBarang', JSON.stringify(daftarBarang));
-                
-                // Render ulang tabel
+            try {
+                await barangCollection.add({
+                    nama: namaBarang,
+                    harga: hargaBarang
+                });
+                formBarang.reset();
                 renderTabel();
+            } catch (error) {
+                console.error("Error menambah data: ", error);
+                alert("Gagal menambahkan barang.");
             }
         });
 
-        // Panggil fungsi renderTabel saat halaman pertama kali dimuat
+        // Fungsi untuk menghapus barang dari Firestore
+        tabelHarga.addEventListener('click', async (event) => {
+            if (event.target.classList.contains('hapus-btn')) {
+                const docId = event.target.getAttribute('data-id');
+                
+                if (confirm('Apakah Anda yakin ingin menghapus barang ini?')) {
+                    try {
+                        await barangCollection.doc(docId).delete();
+                        renderTabel();
+                    } catch (error) {
+                        console.error("Error menghapus data: ", error);
+                        alert("Gagal menghapus barang.");
+                    }
+                }
+            }
+        });
+
+        // Panggil fungsi renderTabel saat halaman dimuat
         document.addEventListener('DOMContentLoaded', renderTabel);
     </script>
-
 </body>
 </html>
